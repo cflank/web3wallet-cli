@@ -139,6 +139,25 @@ impl Wallet {
     pub fn network(&self) -> &str {
         &self.network
     }
+
+    
+    pub fn validate(&self) -> WalletResult<()> {
+        // Validate address format
+        crate::utils::validate_ethereum_address(&self.address)?;
+
+        // Validate network
+        if !config::is_supported_network(&self.network) {
+            return Err(CryptographicError::KdfFailed {
+                details: format!("Unsupported network: {}", self.network),
+            }
+            .into());
+        }
+
+        // Validate derivation path
+        crate::utils::validate_derivation_path(&self.derivation_path)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

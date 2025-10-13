@@ -136,4 +136,84 @@ impl CryptoService {
 
         Ok(mac.finalize().into_bytes().to_vec())
     }
+
+
+    pub fn decrypt_wallet(
+        keystore: &Keystore,
+        password: &str
+    ) -> WalletResult<Wallet> {
+        let salt = keystore.salt()?;
+        let nonce_bytes = keystore.nonce()?;
+        let ciphertext = keystore.encrypted_data()?;
+
+        let mut key_bytes = vec![0u8; config::crypto::KEY_LENGTH];
+
+        match &keystore.kdf_params() {
+            KdfParams::Argon2 { memory, time, parallelism, .. } => {
+                Self::derive_key_argon2(
+                    password.as_bytes(),
+                    &salt,
+                    *memory,
+                    *time,
+                    *parallelism,
+                    &mut key_bytes
+                )?;
+            },
+            KdfParams::Pbkdf2 { c, .. } => {
+                pbkdf2_hmac::<Sha256>(password.as_bytes(), &salt, *c, &mut key_bytes);
+            },
+        }
+
+        // Verify MAC
+        let expected_mac = Self::compute_mac(&key_bytes, &ciphertext, &nonce_bytes)?;
+        if expected_mac != keystore.mac()? {
+            return Err(CryptographicError::DecryptionFailed {
+                context: "Mac verified failed".to_string(),
+            }
+            .into());
+        }
+
+        let cipher = Aes256Gcm::new_from_slice(&key_bytes).map_err(|e| {
+            CryptographicError::KdfFailed {
+                details: format!("AES cipher creation failed: {}", e),
+            }
+        })?;
+
+        let nonce = Nonce::from_slice(&nonce_bytes);
+        let decrypted_data = cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|e| {
+            CryptographicError::DecryptionFailed {
+                context: format!("Decryption failed: {}", e),
+            }
+        })?;
+
+        // Clear sensitive data
+        key_bytes.zeroize();
+
+        let wallet: Wallet = serde_json::from_slice(&decrypted_data).map_err(|e|{
+            CryptographicError::DataCorruption { details: format!("Failed to parse wallet JSON: {}", e) }
+        })?;
+
+        Ok(wallet)
+    }
+
+    pub fn load_keystore<P: AsRef<Path>>(path: P) -> WalletResult<Keystore>{
+        let data = std::fs::read_to_string(path).map_err(|e|{
+            CryptographicError::DataCorruption { details: format!("Failed to read keystore file: {}", e) }
+        })?;
+
+        let keystore: Keystore = serde_json::from_str(&data).map_err(|e|{
+            CryptographicError::DataCorruption { details: format!("Failed to parse keystore JSON: {}", e) }
+        })?;
+
+        keystore.validate()?;
+        Ok(keystore)
+    }
+
+    pub fn save_keystore<P: AsRef<Path>>(keystore: &Keystore, path: P) -> WalletResult<()>{
+        let json = keystore.to_json()?;
+        std::fs::write(path, json).map_err(|e|{
+            CryptographicError::DataCorruption { details: format!("Failed to write keystore file: {}", e) }
+        })?;
+        Ok(())  
+    }
 }
