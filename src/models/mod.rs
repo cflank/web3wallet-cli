@@ -6,3 +6,4 @@ pub mod wallet;
 pub use address::Address;
 pub use keystore::Keystore;
 pub use wallet::Wallet;
+// pub use command::{CommandResult, OutputFormat};

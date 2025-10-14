@@ -14,11 +14,18 @@ pub enum WalletError {
     #[error("Authentication error: {0}")]
     Authentication(#[from]AuthenticationError),
 
+    /// Network operation failures
+    #[error("Network error: {0}")]
+    Network(#[from] NetworkError),
+
     #[error("I/O error: {0}")]
     Io(String),
 
     #[error("Validation error: {0}")]
     Validation(#[from] ValidationError),
+
+    #[error("Feature not implemented: {0}")]
+    NotImplemented(String),
 
     #[error("JSON error: {0}")]
     Json(String),
@@ -86,7 +93,7 @@ pub enum CryptographicError{
     },
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum FilesystemError {
     #[error("FS_001: Permission denied for file operation")]
     PermissionDenied{
@@ -100,9 +107,50 @@ pub enum FilesystemError {
         director: String
     },
 
+    
+    #[error("FS_003: Directory not accessible")]
+    DirectoryNotAccessible {
+        /// Directory path
+        path: String,
+        /// Error details
+        details: String,
+    },
+
+    #[error("FS_004: Insufficient disk space for operation")]
+    InsufficientSpace {
+        /// Required space in bytes
+        required: u64,
+        /// Available space in bytes
+        available: u64,
+    },
+
+    #[error("FS_005: File already exists")]
+    FileExists {
+        /// File path
+        path: String,
+        /// Suggestion for resolution
+        suggestion: String,
+    },
+
+    #[error("FS_006: Invalid file format or corruption")]
+    InvalidFormat {
+        /// File path
+        path: String,
+        /// Error details
+        details: String,
+    },
+    
     #[error("FS_007: Path traversal security violoation")]
     PathTraversal{
         path : String,
+    },
+
+    #[error("FS_008: File lock acquisition failed")]
+    LockFailed {
+        /// File path
+        path: String,
+        /// Timeout duration
+        timeout: std::time::Duration,
     },
 }
 
@@ -212,5 +260,82 @@ pub enum ValidationError {
     },
 }
 
+#[derive(Error, Debug, Clone, PartialEq)]
+pub enum NetworkError {
+    /// Network connectivity failure
+    #[error("NETWORK_001: Network connectivity failure")]
+    ConnectivityFailure {
+        /// Target endpoint
+        endpoint: String,
+        /// Error details
+        details: String,
+    },
 
+    /// Request timeout
+    #[error("NETWORK_002: Request timeout")]
+    RequestTimeout {
+        /// Request type
+        request_type: String,
+        /// Timeout duration
+        timeout: std::time::Duration,
+    },
+
+    /// Invalid network configuration
+    #[error("NETWORK_003: Invalid network configuration")]
+    InvalidConfiguration {
+        /// Configuration key
+        key: String,
+        /// Error details
+        details: String,
+    },
+
+    /// Rate limiting exceeded
+    #[error("NETWORK_004: Rate limiting exceeded")]
+    RateLimitExceeded {
+        /// Retry after duration
+        retry_after: std::time::Duration,
+    },
+
+    /// Unsupported network protocol
+    #[error("NETWORK_005: Unsupported network protocol")]
+    UnsupportedProtocol {
+        /// Protocol name
+        protocol: String,
+        /// Supported protocols
+        supported: Vec<String>,
+    },
+}
+
+macro_rules! impl_error_traits {
+    ($error_type:ty, $prefix:expr) => {
+        impl $error_type {
+            fn code(&self) -> &'static str {
+                concat!($prefix, "_001") // Simplified for now
+            }
+
+            fn suggestion(&self) -> Option<String> {
+                None // Can be expanded for specific suggestions
+            }
+        }
+    };
+}
+
+impl_error_traits!(FilesystemError, "FS");
+impl_error_traits!(UserInputError, "INPUT");
+impl_error_traits!(AuthenticationError, "AUTH");
+impl_error_traits!(NetworkError, "NETWORK");
+impl_error_traits!(ValidationError, "VALIDATION");
+
+
+impl From<std::io::Error> for WalletError {
+    fn from(err: std::io::Error) -> Self {
+        WalletError::Io(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for WalletError {
+    fn from(err: serde_json::Error) -> Self {
+        WalletError::Json(err.to_string())
+    }
+}
 pub type WalletResult<T> = Result<T, WalletError>;

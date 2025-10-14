@@ -137,6 +137,9 @@ impl CryptoService {
         Ok(mac.finalize().into_bytes().to_vec())
     }
 
+    pub fn validate_password(password: &str) -> WalletResult<()>{
+        todo!("valideate password")
+    }
 
     pub fn decrypt_wallet(
         keystore: &Keystore,
@@ -196,8 +199,8 @@ impl CryptoService {
         Ok(wallet)
     }
 
-    pub fn load_keystore<P: AsRef<Path>>(path: P) -> WalletResult<Keystore>{
-        let data = std::fs::read_to_string(path).map_err(|e|{
+    pub async fn load_keystore<P: AsRef<Path>>(path: P) -> WalletResult<Keystore>{
+        let data = tokio::fs::read_to_string(path).await.map_err(|e|{
             CryptographicError::DataCorruption { details: format!("Failed to read keystore file: {}", e) }
         })?;
 
@@ -209,9 +212,9 @@ impl CryptoService {
         Ok(keystore)
     }
 
-    pub fn save_keystore<P: AsRef<Path>>(keystore: &Keystore, path: P) -> WalletResult<()>{
+    pub async fn save_keystore<P: AsRef<Path>>(keystore: &Keystore, path: P) -> WalletResult<()>{
         let json = keystore.to_json()?;
-        std::fs::write(path, json).map_err(|e|{
+        tokio::fs::write(path, json).await.map_err(|e|{
             CryptographicError::DataCorruption { details: format!("Failed to write keystore file: {}", e) }
         })?;
         Ok(())  

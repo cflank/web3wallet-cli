@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-
+use crate::services::mnemonic::MnemonicService;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct Wallet {
     #[zeroize(skip)]
@@ -138,9 +138,19 @@ impl Wallet {
     }
     pub fn network(&self) -> &str {
         &self.network
+    }    
+    pub fn mnemonic(&self) -> &str {
+        &self.mnemonic
+    }   
+
+    pub fn derivation_path(&self) -> &str {
+        &self.derivation_path
+    } 
+
+    pub fn created_at(&self) -> chrono::DateTime<chrono::Utc> {
+        self.created_at
     }
 
-    
     pub fn validate(&self) -> WalletResult<()> {
         // Validate address format
         crate::utils::validate_ethereum_address(&self.address)?;
@@ -158,6 +168,16 @@ impl Wallet {
 
         Ok(())
     }
+
+    pub fn generate(
+        word_count: u8,
+        network: &str,
+        alias: Option<String>
+    ) -> WalletResult<Self> {
+        let secure_mnemonic = MnemonicService::generate(word_count)?;
+        let mnemonic_str = secure_mnemonic.phrase().to_string(); // 复制出来，因为 secure_mnemonic 会在作用域结束时清零
+        Self::from_mnemonic(&mnemonic_str, network, alias)        
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,4 +185,21 @@ pub struct DerivedAddress{
     address: String,
     index: u32,
     derivation_path: String,
+}
+
+impl DerivedAddress {
+    /// Get address
+    pub fn address(&self) -> &str {
+        &self.address
+    }
+
+    /// Get derivation index
+    pub fn index(&self) -> u32 {
+        self.index
+    }
+
+    /// Get derivation path
+    pub fn derivation_path(&self) -> &str {
+        &self.derivation_path
+    }
 }
