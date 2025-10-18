@@ -137,8 +137,41 @@ impl CryptoService {
         Ok(mac.finalize().into_bytes().to_vec())
     }
 
-    pub fn validate_password(password: &str) -> WalletResult<()>{
-        todo!("valideate password")
+    pub fn validate_password(password: &str) -> WalletResult<()> {
+        let mut requirements = Vec::new();
+
+        if password.len() < config::crypto::MIN_PASSWORD_LENGTH {
+            requirements.push(format!("At least {} characters", config::crypto::MIN_PASSWORD_LENGTH));
+        }
+
+        if password.len() > config::crypto::MAX_PASSWORD_LENGTH {
+            requirements.push(format!("At most {} characters", config::crypto::MAX_PASSWORD_LENGTH));
+        }
+
+        if !password.chars().any(|c| c.is_ascii_lowercase()) {
+            requirements.push("At least one lowercase letter".to_string());
+        }
+
+        if !password.chars().any(|c| c.is_ascii_uppercase()) {
+            requirements.push("At least one uppercase letter".to_string());
+        }
+
+        if !password.chars().any(|c| c.is_ascii_digit()) {
+            requirements.push("At least one digit".to_string());
+        }
+
+        if !password.chars().any(|c| "!@#$%^&*()_+-=[]{}|;:,.<>?".contains(c)) {
+            requirements.push("At least one special character".to_string());
+        }
+
+        if !requirements.is_empty() {
+            return Err(crate::errors::AuthenticationError::WeakPassword {
+                requirements,
+            }
+            .into());
+        }
+
+        Ok(())
     }
 
     pub fn decrypt_wallet(

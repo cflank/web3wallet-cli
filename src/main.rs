@@ -515,7 +515,7 @@ async fn execute_derive(
     output: OutputFormat
 ) -> WalletResult<()> {
     
-    // todo!();
+    
     let manager = WalletManager::new(config.clone());
 
     let wallet = if let Some(filename) = args.from_file{

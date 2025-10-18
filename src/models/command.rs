@@ -10,7 +10,7 @@ pub enum OutputFormat {
 }
 
 
-// ToDo: Implement Display trait for OutputFormat
+
 #[derive (Debug, Clone)]
 pub struct BaseComand{
     pub output: OutputFormat,
@@ -18,7 +18,7 @@ pub struct BaseComand{
     pub config: Option<PathBuf>,
 }
 
-/// Todo BaseCommand Default impl
+
 impl Default for BaseComand{
     fn default() -> Self {
         Self{

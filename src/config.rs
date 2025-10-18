@@ -35,6 +35,8 @@ pub mod crypto{
     pub const KEY_LENGTH : usize = 32;
 
     pub const MIN_PASSWORD_LENGTH : usize = 8;
+
+    pub const MAX_PASSWORD_LENGTH: usize = 1024;
 }
 
 pub mod fs {
