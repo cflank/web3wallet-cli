@@ -20,6 +20,11 @@ impl WalletManager {
         Wallet::from_mnemonic(mnemonic.phrase(), &self.config.network, None)
     }
 
+    pub async fn create_wallet_with_network(&self, word_count: u8, network: &str) -> WalletResult<Wallet> {
+        let mnemonic= MnemonicService::generate(word_count)?;
+        Wallet::from_mnemonic(mnemonic.phrase(), network, None)
+    }
+
     pub async fn import_from_mnemoic(&self, mnemonic_str: &str) -> WalletResult<Wallet> {
         let mnemonic = MnemonicService::validate(mnemonic_str)?;
         Wallet::from_mnemonic(mnemonic.phrase(), &self.config.network, None)

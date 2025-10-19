@@ -5,6 +5,17 @@ use tracing::{error, info};
 use web3wallet_cli::{WalletConfig, WalletError, WalletManager, WalletResult};
 use web3wallet_cli::errors::{UserInputError, FilesystemError};
 
+// Helper function for password input that supports testing
+fn get_password(prompt: &str) -> Result<String, std::io::Error> {
+    // Check if we're in test mode (environment variable set)
+    if let Ok(test_password) = std::env::var("TEST_WALLET_PASSWORD") {
+        return Ok(test_password);
+    }
+
+    // Normal interactive mode
+    prompt_password(prompt)
+}
+
 #[derive(Parser)]
 #[command(
     name = "wallet",
@@ -103,10 +114,10 @@ struct DeriveArgs {
     #[arg(short, long)]
     from_file: Option<String>,
 
-    #[arg(short, long, default_value = "1")]
+    #[arg(short = 'n', long, default_value = "1")]
     count: u32,
 
-    #[arg(short, long, default_value = "0")]
+    #[arg(short = 'i', long, default_value = "0")]
     start_index: u32,
 }
 
@@ -165,14 +176,14 @@ async fn execute_create(args: CreateArgs,
         let manager = WalletManager::new(config.clone());
 
         info!("Creating a new wallet with {} words on {} network", args.words, args.network);
-        let wallet = manager.create_wallet(args.words).await?;
+        let wallet = manager.create_wallet_with_network(args.words, &args.network).await?;
 
         match output{
             OutputFormat::Table=>{
                 println!("New wallet created:");
                 println!("Address: {}", wallet.address());
                 println!("Mnemonic: {}", wallet.mnemonic());
-                println!("Private Key: {}", wallet.network());
+                println!("Network: {}", wallet.network());
             }
             OutputFormat::Json=>{
                 let output = serde_json::json!({
@@ -189,8 +200,8 @@ async fn execute_create(args: CreateArgs,
         }
 
         if let Some(filename) = args.save {
-            let password = prompt_password("Enter a password to encrypt the wallet: ")?;
-            let confirm_password = prompt_password("Confirm password: ")?;
+            let password = get_password("Enter a password to encrypt the wallet: ")?;
+            let confirm_password = get_password("Confirm password: ")?;
 
             if password != confirm_password {
                 return Err(WalletError::UserInput(UserInputError::PasswordMismatch));
@@ -223,7 +234,7 @@ async fn excute_import(args: ImportArgs, config: &WalletConfig, output: OutputFo
         info!("Importing wallet from private key...");
         manager.import_from_private_key(&private).await?
     } else{
-        let mnemonic = prompt_password("Enter mnemonic phrase...")?;
+        let mnemonic = get_password("Enter mnemonic phrase...")?;
         manager.import_from_mnemoic(&mnemonic).await?
     };
 
@@ -253,8 +264,8 @@ async fn excute_import(args: ImportArgs, config: &WalletConfig, output: OutputFo
     }
 
     if let Some(filename) = args.save{
-        let password = prompt_password("Enter the password to encrypt wallet..")?;
-        let confirm = prompt_password("Confirm password....")?;
+        let password = get_password("Enter the password to encrypt wallet..")?;
+        let confirm = get_password("Confirm password....")?;
 
         if password != confirm {
             return Err(WalletError::UserInput(
@@ -325,7 +336,7 @@ async fn excute_load(
     }
     
 
-    let password = prompt_password("Enter a password to encrypt the wallet: ")?;   
+    let password = get_password("Enter a password to encrypt the wallet: ")?;
     let wallet = manager.load_wallet(&file_path, &password).await?;
     
 
@@ -486,23 +497,24 @@ async fn execute_list(
             }
         }
         OutputFormat::Json => {
-            let wallet_list: Vec<_> = wallets.into_iter().map(|(path, keysotre)| {
+            let wallet_list: Vec<_> = wallets.into_iter().map(|(path, keystore)| {
                 serde_json::json!({
                     "filename": path.file_name().and_then(|n| n.to_str()).unwrap_or("Unknown"),
                     "path": path.display().to_string(),
-                    "address": keysotre.metadata.address,
-                    "network": keysotre.metadata.network,
-                    "create_at": keysotre.metadata.created_at,
-                    "alias": keysotre.metadata.alias
+                    "address": keystore.metadata.address,
+                    "network": keystore.metadata.network,
+                    "created_at": keystore.metadata.created_at,
+                    "alias": keystore.metadata.alias
                 })
             }).collect();
 
             let output = serde_json::json!({
-                    "directory": wallet_dir.display().to_string(),
-                    "count": wallet_list.len(),
-                    "wallets": wallet_list                
-                }
-            );
+                "success": true,
+                "directory": wallet_dir.display().to_string(),
+                "count": wallet_list.len(),
+                "wallets": wallet_list
+            });
+            println!("{}", serde_json::to_string_pretty(&output)?);
         }
     }
 
@@ -525,10 +537,10 @@ async fn execute_derive(
             config.wallets_path.join(&filename)
         };
 
-        let password = prompt_password("Enter wallet password")?;
+        let password = get_password("Enter wallet password")?;
         manager.load_wallet(&file_path, &password).await?
     } else {
-        let mnemonic = prompt_password("Enter wallet mnemonic...")?;
+        let mnemonic = get_password("Enter wallet mnemonic...")?;
         manager.import_from_mnemoic(&mnemonic).await?
     };
 

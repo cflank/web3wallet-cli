@@ -60,7 +60,7 @@ pub fn validate_derivation_path(path: &str) -> WalletResult<()> {
             }.into());
         }
 
-        let num_str = if component.ends_with("/'"){
+        let num_str = if component.ends_with("'"){
             &component[..component.len() -1]
         }else{
             component

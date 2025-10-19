@@ -30,7 +30,7 @@ pub mod crypto{
 
     pub const SALT_LENGTH : usize = 32;
 
-    pub const NONCE_LENGTH : usize = 32;
+    pub const NONCE_LENGTH : usize = 12;
 
     pub const KEY_LENGTH : usize = 32;
 

@@ -204,7 +204,92 @@ impl Keystore{
     }
 
     pub fn validate(&self)->WalletResult<()>{
-        todo!();
+        // Validate version
+        if self.version.is_empty() {
+            return Err(ValidationError::InvalidKeystoreSchema {
+                error: "Missing version".to_string(),
+                file_path: "keystore".to_string(),
+            }.into());
+        }
+
+        // Validate address format (should be hex with 0x prefix)
+        if !self.metadata.address.starts_with("0x") || self.metadata.address.len() != 42 {
+            return Err(ValidationError::InvalidKeystoreSchema {
+                error: "Invalid address format".to_string(),
+                file_path: "keystore".to_string(),
+            }.into());
+        }
+
+        // Validate required fields are not empty
+        if self.metadata.network.is_empty() {
+            return Err(ValidationError::InvalidKeystoreSchema {
+                error: "Missing network".to_string(),
+                file_path: "keystore".to_string(),
+            }.into());
+        }
+
+        if self.crypto.cipher != "aes-256-gcm" {
+            return Err(ValidationError::InvalidKeystoreSchema {
+                error: "Unsupported cipher".to_string(),
+                file_path: "keystore".to_string(),
+            }.into());
+        }
+
+        // Validate hex fields can be decoded
+        hex::decode(&self.crypto.ciphertext).map_err(|_| {
+            ValidationError::InvalidKeystoreSchema {
+                error: "Invalid ciphertext hex".to_string(),
+                file_path: "keystore".to_string(),
+            }
+        })?;
+
+        hex::decode(&self.crypto.cipherparams.iv).map_err(|_| {
+            ValidationError::InvalidKeystoreSchema {
+                error: "Invalid IV hex".to_string(),
+                file_path: "keystore".to_string(),
+            }
+        })?;
+
+        hex::decode(&self.crypto.mac).map_err(|_| {
+            ValidationError::InvalidKeystoreSchema {
+                error: "Invalid MAC hex".to_string(),
+                file_path: "keystore".to_string(),
+            }
+        })?;
+
+        // Validate KDF parameters
+        match &self.crypto.kdfparams {
+            KdfParams::Argon2 { salt, dklen, memory, time, parallelism } => {
+                hex::decode(salt).map_err(|_| {
+                    ValidationError::InvalidKeystoreSchema {
+                        error: "Invalid Argon2 salt hex".to_string(),
+                        file_path: "keystore".to_string(),
+                    }
+                })?;
+                if *dklen == 0 || *memory == 0 || *time == 0 || *parallelism == 0 {
+                    return Err(ValidationError::InvalidKeystoreSchema {
+                        error: "Invalid Argon2 parameters".to_string(),
+                        file_path: "keystore".to_string(),
+                    }.into());
+                }
+            },
+            KdfParams::Pbkdf2 { salt, dklen, c, .. } => {
+                hex::decode(salt).map_err(|_| {
+                    ValidationError::InvalidKeystoreSchema {
+                        error: "Invalid PBKDF2 salt hex".to_string(),
+                        file_path: "keystore".to_string(),
+                    }
+                })?;
+                if *dklen == 0 || *c == 0 {
+                    return Err(ValidationError::InvalidKeystoreSchema {
+                        error: "Invalid PBKDF2 parameters".to_string(),
+                        file_path: "keystore".to_string(),
+                    }.into());
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn to_json(&self)->WalletResult<String>{
