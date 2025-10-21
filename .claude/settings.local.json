@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo test:*)"
+      "Bash(cargo test:*)",
+      "Bash(TEST_WALLET_PASSWORD=test cargo test:*)",
+      "Bash(bip39 derive:*)"
     ],
     "deny": [],
     "ask": []
